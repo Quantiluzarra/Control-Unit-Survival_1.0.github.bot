@@ -2,9 +2,8 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Control Unit Survival</title>
+    <title>Memory Challenge</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-primary: #0a192f;
@@ -17,36 +16,24 @@
             padding: 0;
             box-sizing: border-box;
         }
-        html, body {
-            height: 100%;
-            overscroll-behavior: none;
-            touch-action: manipulation;
-        }
         body {
-            font-family: 'Orbitron', sans-serif;
+            font-family: 'Arial', sans-serif;
             background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
             color: var(--text-color);
             display: flex;
             justify-content: center;
             align-items: center;
+            min-height: 100vh;
             overflow: hidden;
+            text-align: center;
         }
         #gameContainer {
             width: 100%;
             max-width: 500px;
             padding: 20px;
-            text-align: center;
             background: rgba(17, 34, 64, 0.8);
             border-radius: 15px;
             box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-            transition: all 0.5s ease;
-        }
-        #welcome {
-            font-size: 3em;
-            color: var(--accent-color);
-            text-shadow: 0 0 10px rgba(100,255,218,0.5);
-            animation: pulse 2s infinite;
-            margin-bottom: 20px;
         }
         .button {
             display: block;
@@ -57,14 +44,28 @@
             padding: 15px;
             margin: 10px 0;
             border-radius: 5px;
-            font-family: 'Orbitron', sans-serif;
-            font-weight: bold;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         .button:hover {
             transform: scale(1.05);
-            box-shadow: 0 0 15px var(--accent-color);
+        }
+        .telegram-button {
+            display: block;
+            width: 100%;
+            background: #0088cc;
+            color: white;
+            border: none;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .telegram-button:hover {
+            background: #00a2ff;
+            transform: scale(1.05);
         }
         #gameGrid {
             display: grid;
@@ -80,7 +81,6 @@
             align-items: center;
             border-radius: 10px;
             transition: all 0.3s ease;
-            position: relative;
             cursor: pointer;
         }
         .grid-cell.active {
@@ -91,20 +91,6 @@
             background: #ff6b6b;
             animation: shake 0.5s;
         }
-        .author {
-            position: fixed;
-            bottom: 10px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            font-size: 0.8em;
-            color: var(--accent-color);
-            opacity: 0.7;
-        }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
             10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
@@ -114,179 +100,206 @@
 </head>
 <body>
     <div id="gameContainer">
-        <div id="welcome">CONTROL UNIT</div>
-        
         <div id="menu">
-            <h1 style="color: var(--accent-color); margin-bottom: 20px;">Survival</h1>
-            <button class="button" id="normalMode">Обычный режим (10 раундов)</button>
-            <button class="button" id="survivalMode">Режим выживания</button>
-            <button class="button" id="statsButton">Статистика</button>
+            <h1>Memory Challenge</h1>
+            <button class="button" id="easyMode">Легкий</button>
+            <button class="button" id="normalMode">Средний</button>
+            <button class="button" id="hardMode">Сложный</button>
+            <a href="https://t.me/fuitec" target="_blank" class="telegram-button">
+                Перейти на канал автора
+            </a>
         </div>
-
+        
         <div id="gameBoard" style="display:none;">
-            <h2 style="color: var(--accent-color)">Раунд: <span id="currentRound">1</span></h2>
+            <h2>Раунд: <span id="currentRound">1</span></h2>
             <div id="gameGrid"></div>
-            <div id="gameStatus" style="margin-top: 15px; color: var(--accent-color)"></div>
-        </div>
-
-        <div id="statsBoard" style="display:none;">
-            <h2 style="color: var(--accent-color)">Статистика</h2>
-            <p>Побед: <span id="totalWins">0</span></p>
-            <p>Игр сыграно: <span id="totalGames">0</span></p>
-            <button class="button" id="backToMenu">Назад</button>
+            <div id="gameStatus"></div>
         </div>
     </div>
 
-    <div class="author">Created by t.me/fuitec</div>
-
     <script>
-        // Основные элементы
-        const elements = {
-            welcome: document.getElementById('welcome'),
-            menu: document.querySelector('#menu'),
-            gameBoard: document.getElementById('gameBoard'),
-            statsBoard: document.getElementById('statsBoard'),
-            gameGrid: document.getElementById('gameGrid'),
-            currentRound: document.getElementById('currentRound'),
-            gameStatus: document.getElementById('gameStatus'),
-            totalWins: document.getElementById('totalWins'),
-            totalGames: document.getElementById('totalGames')
+        const config = {
+            easy: { gridSize: 9, sequenceLength: 3, rounds: 5 },
+            normal: { gridSize: 16, sequenceLength: 4, rounds: 8 },
+            hard: { gridSize: 25, sequenceLength: 5, rounds: 10 }
         };
 
-        // Состояние игры
-        const gameState = {
-            mode: 'normal',
-            totalRounds: 10,
+        const state = {
+            currentMode: 'normal',
             currentRound: 1,
             sequence: [],
             playerSequence: [],
-            stats: {
-                wins: 0,
-                games: 0
-            }
+            isPlayerTurn: false
         };
 
-        // Инициализация
-        function init() {
-            // Скрытие приветствия и показ меню
-            setTimeout(() => {
-                elements.welcome.style.display = 'none';
-                elements.menu.style.display = 'block';
-            }, 3000);
+        const elements = {
+            menu: document.getElementById('menu'),
+            gameBoard: document.getElementById('gameBoard'),
+            gameGrid: document.getElementById('gameGrid'),
+            currentRound: document.getElementById('currentRound'),
+            gameStatus: document.getElementById('gameStatus')
+        };
 
-            // Привязка событий
-            document.getElementById('normalMode').addEventListener('click', () => startGame('normal'));
-            document.getElementById('survivalMode').addEventListener('click', () => startGame('survival'));
-            document.getElementById('statsButton').addEventListener('click', showStats);
-            document.getElementById('backToMenu').addEventListener('click', backToMenu);
+        function initGame(mode) {
+            state.currentMode = mode;
+            state.currentRound = 1;
+            
+            elements.menu.style.display = 'none';
+            elements.gameBoard.style.display = 'block';
+            
+            createGrid(config[mode].gridSize);
+            startRound();
         }
 
-        // Создание игровой сетки
-        function createGrid() {
+        function createGrid(size) {
             elements.gameGrid.innerHTML = '';
-            for (let i = 0; i < 16; i++) {
+            elements.gameGrid.style.gridTemplateColumns = `repeat(${Math.sqrt(size)}, 1fr)`;
+            
+            for (let i = 0; i < size; i++) {
                 const cell = document.createElement('div');
                 cell.classList.add('grid-cell');
                 cell.dataset.index = i;
-                cell.addEventListener('click', () => playerSelect(i));
+                cell.addEventListener('click', () => handleCellClick(i));
                 elements.gameGrid.appendChild(cell);
             }
         }
 
-        // Генерация последовательности
-        function generateSequence() {
-            gameState.sequence = Array.from({length: 4}, () => Math.floor(Math.random() * 16));
+        function startRound() {
+            elements.currentRound.textContent = state.currentRound;
+            state.sequence = generateSequence();
+            state.playerSequence = [];
+            
+            showSequence();
         }
 
-             // Показ последовательности
+        function generateSequence() {
+            const { gridSize, sequenceLength } = config[state.currentMode];
+            return Array.from(
+                { length: sequenceLength }, 
+                () => Math.floor(Math.random() * gridSize)
+            );
+        }
+
         function showSequence() {
-            gameState.sequence.forEach((index, i) => {
+            state.isPlayerTurn = false;
+            state.sequence.forEach((index, i) => {
                 setTimeout(() => {
                     const cell = document.querySelector(`.grid-cell[data-index="${index}"]`);
                     cell.classList.add('active');
                     setTimeout(() => cell.classList.remove('active'), 500);
-                }, i * 800);
+                    
+                    if (i === state.sequence.length - 1) {
+                        setTimeout(() => {
+                            state.isPlayerTurn = true;
+                            elements.gameStatus.textContent = 'Ваш ход';
+                        }, 500);
+                    }
+                }, i * 600);
             });
         }
 
-        // Выбор игрока
-        function playerSelect(index) {
+        function handleCellClick(index) {
+            if (!state.isPlayerTurn) return;
+
             const cell = document.querySelector(`.grid-cell[data-index="${index}"]`);
             cell.classList.add('active');
             setTimeout(() => cell.classList.remove('active'), 200);
 
-            gameState.playerSequence.push(index);
+            state.playerSequence.push(index);
 
-            if (gameState.playerSequence.length === gameState.sequence.length) {
-                checkSequence();
-            }
-        }
-
-        // Проверка последовательности
-        function checkSequence() {
-            const isCorrect = gameState.sequence.every((val, idx) => val === gameState.playerSequence[idx]);
-            
-            if (isCorrect) {
-                gameState.currentRound++;
-                elements.gameStatus.textContent = 'Верно! Следующий раунд';
-                
-                if (gameState.mode === 'normal' && gameState.currentRound > gameState.totalRounds) {
-                    endGame(true);
-                } else {
-                    setTimeout(nextRound, 1500);
-                }
-            } else {
-                elements.gameStatus.textContent = 'Неверно! Игра окончена';
+            if (state.playerSequence[state.playerSequence.length - 1] !== 
+                state.sequence[state.playerSequence.length - 1]) {
                 endGame(false);
+                return;
+            }
+
+            if (state.playerSequence.length === state.sequence.length) {
+                nextRound();
             }
         }
 
-        // Следующий раунд
         function nextRound() {
-            gameState.playerSequence = [];
-            elements.currentRound.textContent = gameState.currentRound;
-            generateSequence();
-            showSequence();
-        }
-
-        // Старт игры
-        function startGame(mode) {
-            gameState.mode = mode;
-            gameState.currentRound = 1;
-            gameState.stats.games++;
-            elements.totalGames.textContent = gameState.stats.games;
-
-            elements.menu.style.display = 'none';
-            elements.gameBoard.style.display = 'block';
+            state.currentRound++;
             
-            createGrid();
-            generateSequence();
-            showSequence();
-        }
-
-        // Конец игры
-        function endGame(won) {
-            if (won) {
-                gameState.stats.wins++;
-                elements.totalWins.textContent = gameState.stats.wins;
+            if (state.currentRound > config[state.currentMode].rounds) {                endGame(true);
+                return;
             }
             
+            setTimeout(() => {
+                startRound();
+            }, 1000);
+        }
+
+        function endGame(success) {
+            state.isPlayerTurn = false;
+            elements.gameStatus.textContent = success ? 
+                'Поздравляем! Вы победили!' : 
+                'Игра окончена! Попробуйте снова';
+            
+            const cells = document.querySelectorAll('.grid-cell');
+            cells.forEach((cell, index) => {
+                setTimeout(() => {
+                    cell.style.backgroundColor = success ? '#64ffda' : '#ff6b6b';
+                    cell.style.transform = success ? 'scale(1.1)' : 'rotate(10deg)';
+                }, index * 50);
+            });
+
             setTimeout(() => {
                 elements.gameBoard.style.display = 'none';
                 elements.menu.style.display = 'block';
             }, 2000);
         }
 
-        // Показ статистики
-        function showStats() {
-            elements.menu.style.display = 'none';
-            elements.statsBoard.style.display = 'block';
+        function initEventListeners() {
+            document.getElementById('easyMode').addEventListener('click', () => initGame('easy'));
+            document.getElementById('normalMode').addEventListener('click', () => initGame('normal'));
+            document.getElementById('hardMode').addEventListener('click', () => initGame('hard'));
         }
 
-        // Возврат в меню
-        function backToMenu() {
-            elements.statsBoard.style.display = 'none';
-            elements.menu.style.display = 'block';
+        function init() {
+            initEventListeners();
+            
+            // Анимация меню
+            elements.menu.style.opacity = 0;
+            elements.menu.style.transform = 'translateY(50px)';
+            
+            setTimeout(() => {
+                elements.menu.style.transition = 'all 0.5s ease';
+                elements.menu.style.opacity = 1;
+                elements.menu.style.transform = 'translateY(0)';
+            }, 300);
+
+            // Улучшение кнопки Telegram
+            const telegramButton = document.querySelector('.telegram-button');
+            telegramButton.addEventListener('mouseenter', (e) => {
+                e.target.style.transform = 'scale(1.05) rotate(2deg)';
+            });
+            
+            telegramButton.addEventListener('mouseleave', (e) => {
+                e.target.style.transform = 'scale(1) rotate(0deg)';
+            });
+        }
+
+        // Добавляем поддержку клавиатуры
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                elements.gameBoard.style.display = 'none';
+                elements.menu.style.display = 'block';
+            }
+        });
+
+        // Статистика игры (локальное хранилище)
+        function saveGameStats(mode, result) {
+            const stats = JSON.parse(localStorage.getItem('memoryGameStats') || '{}');
+            
+            stats[mode] = stats[mode] || { wins: 0, plays: 0 };
+            stats[mode].plays++;
+            
+            if (result) {
+                stats[mode].wins++;
+            }
+
+            localStorage.setItem('memoryGameStats', JSON.stringify(stats));
         }
 
         // Инициализация при загрузке страницы

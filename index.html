@@ -1,212 +1,296 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Pixel World</title>
+    <meta charset="UTF-8">
+    <title>Control Unit Survival</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background: #000;
-            font-family: monospace;
+        :root {
+            --bg-primary: #0a192f;
+            --bg-secondary: #112240;
+            --accent-color: #64ffda;
+            --text-color: #e6f1ff;
         }
-        canvas { 
-            position: absolute;
-            top: 0;
-            left: 0;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        #inventory {
-            position: fixed;
-            bottom: 10px;
-            width: 100%;
+        html, body {
+            height: 100%;
+            overscroll-behavior: none;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+            color: var(--text-color);
             display: flex;
             justify-content: center;
+            align-items: center;
+            overflow: hidden;
         }
-        .block {
-            width: 50px;
-            height: 50px;
-            background: rgba(255,255,255,0.3);
-            margin: 0 5px;
-            cursor: pointer;
+        #gameContainer {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
             text-align: center;
-            line-height: 50px;
-            color: white;
+            background: rgba(17, 34, 64, 0.8);
+            border-radius: 15px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            transition: all 0.5s ease;
+        }
+        #welcome {
+            font-size: 3em;
+            color: var(--accent-color);
+            text-shadow: 0 0 10px rgba(100,255,218,0.5);
+            animation: pulse 2s infinite;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: block;
+            width: 100%;
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border: none;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--accent-color);
+        }
+        #gameGrid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .grid-cell {
+            aspect-ratio: 1/1;
+            background: var(--bg-secondary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            position: relative;
+            cursor: pointer;
+        }
+        .grid-cell.active {
+            background: var(--accent-color);
+            transform: scale(1.1);
+        }
+        .grid-cell.wrong {
+            background: #ff6b6b;
+            animation: shake 0.5s;
+        }
+        .author {
+            position: fixed;
+            bottom: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 0.8em;
+            color: var(--accent-color);
+            opacity: 0.7;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="inventory">
-        <div class="block" data-block="1">🪨</div>
-        <div class="block" data-block="2">🌳</div>
-        <div class="block" data-block="3">🌿</div>
+    <div id="gameContainer">
+        <div id="welcome">CONTROL UNIT</div>
+        
+        <div id="menu">
+            <h1 style="color: var(--accent-color); margin-bottom: 20px;">Survival</h1>
+            <button class="button" id="normalMode">Обычный режим (10 раундов)</button>
+            <button class="button" id="survivalMode">Режим выживания</button>
+            <button class="button" id="statsButton">Статистика</button>
+        </div>
+
+        <div id="gameBoard" style="display:none;">
+            <h2 style="color: var(--accent-color)">Раунд: <span id="currentRound">1</span></h2>
+            <div id="gameGrid"></div>
+            <div id="gameStatus" style="margin-top: 15px; color: var(--accent-color)"></div>
+        </div>
+
+        <div id="statsBoard" style="display:none;">
+            <h2 style="color: var(--accent-color)">Статистика</h2>
+            <p>Побед: <span id="totalWins">0</span></p>
+            <p>Игр сыграно: <span id="totalGames">0</span></p>
+            <button class="button" id="backToMenu">Назад</button>
+        </div>
     </div>
 
+    <div class="author">Created by t.me/fuitec</div>
+
     <script>
-    // Настройки игры
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+        // Основные элементы
+        const elements = {
+            welcome: document.getElementById('welcome'),
+            menu: document.querySelector('#menu'),
+            gameBoard: document.getElementById('gameBoard'),
+            statsBoard: document.getElementById('statsBoard'),
+            gameGrid: document.getElementById('gameGrid'),
+            currentRound: document.getElementById('currentRound'),
+            gameStatus: document.getElementById('gameStatus'),
+            totalWins: document.getElementById('totalWins'),
+            totalGames: document.getElementById('totalGames')
+        };
 
-    // Константы мира
-    const TILE_SIZE = 40;
-    const WORLD_WIDTH = 200;
-    const WORLD_HEIGHT = 100;
+        // Состояние игры
+        const gameState = {
+            mode: 'normal',
+            totalRounds: 10,
+            currentRound: 1,
+            sequence: [],
+            playerSequence: [],
+            stats: {
+                wins: 0,
+                games: 0
+            }
+        };
 
-    // Цвета блоков
-    const BLOCK_COLORS = {
-        0: '#135',     // Пустота
-        1: '#654',     // Камень
-        2: '#461',     // Дерево
-        3: '#2a4'      // Трава
-    };
+        // Инициализация
+        function init() {
+            // Скрытие приветствия и показ меню
+            setTimeout(() => {
+                elements.welcome.style.display = 'none';
+                elements.menu.style.display = 'block';
+            }, 3000);
 
-    // Генерация мира
-    let world = Array(WORLD_WIDTH).fill().map(() => 
-        Array(WORLD_HEIGHT).fill(0)
-    );
+            // Привязка событий
+            document.getElementById('normalMode').addEventListener('click', () => startGame('normal'));
+            document.getElementById('survivalMode').addEventListener('click', () => startGame('survival'));
+            document.getElementById('statsButton').addEventListener('click', showStats);
+            document.getElementById('backToMenu').addEventListener('click', backToMenu);
+        }
 
-    // Генерация ландшафта
-    function generateWorld() {
-        for (let x = 0; x < WORLD_WIDTH; x++) {
-            // Создаем холмистый ландшафт
-            let height = Math.floor(WORLD_HEIGHT * 0.6 + 
-                Math.sin(x * 0.1) * 10 + 
-                Math.random() * 5);
+        // Создание игровой сетки
+        function createGrid() {
+            elements.gameGrid.innerHTML = '';
+            for (let i = 0; i < 16; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('grid-cell');
+                cell.dataset.index = i;
+                cell.addEventListener('click', () => playerSelect(i));
+                elements.gameGrid.appendChild(cell);
+            }
+        }
+
+        // Генерация последовательности
+        function generateSequence() {
+            gameState.sequence = Array.from({length: 4}, () => Math.floor(Math.random() * 16));
+        }
+
+             // Показ последовательности
+        function showSequence() {
+            gameState.sequence.forEach((index, i) => {
+                setTimeout(() => {
+                    const cell = document.querySelector(`.grid-cell[data-index="${index}"]`);
+                    cell.classList.add('active');
+                    setTimeout(() => cell.classList.remove('active'), 500);
+                }, i * 800);
+            });
+        }
+
+        // Выбор игрока
+        function playerSelect(index) {
+            const cell = document.querySelector(`.grid-cell[data-index="${index}"]`);
+            cell.classList.add('active');
+            setTimeout(() => cell.classList.remove('active'), 200);
+
+            gameState.playerSequence.push(index);
+
+            if (gameState.playerSequence.length === gameState.sequence.length) {
+                checkSequence();
+            }
+        }
+
+        // Проверка последовательности
+        function checkSequence() {
+            const isCorrect = gameState.sequence.every((val, idx) => val === gameState.playerSequence[idx]);
             
-            for (let y = height; y < WORLD_HEIGHT; y++) {
-                world[x][y] = y > height + 3 ? 1 : 2;
-            }
-        }
-    }
-
-    // Игрок
-    const player = {
-        x: WORLD_WIDTH / 2,
-        y: 10,
-        width: 1,
-        height: 2,
-        speed: 5,
-        velocityY: 0,
-        selectedBlock: 1
-    };
-
-    // Физика и движение
-    function updatePhysics() {
-        // Гравитация
-        player.velocityY += 0.5;
-        player.y += player.velocityY;
-
-        // Проверка столкновений с землей
-        if (world[Math.floor(player.x)][Math.floor(player.y + player.height)]) {
-            player.y = Math.floor(player.y);
-            player.velocityY = 0;
-        }
-    }
-
-    // Управление
-    const keys = {
-        left: false,
-        right: false,
-        up: false
-    };
-
-    // Обработчики событий
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft') keys.left = true;
-        if (e.key === 'ArrowRight') keys.right = true;
-        if (e.key === 'ArrowUp') keys.up = true;
-    });
-
-    document.addEventListener('keyup', (e) => {
-        if (e.key === 'ArrowLeft') keys.left = false;
-        if (e.key === 'ArrowRight') keys.right = false;
-        if (e.key === 'ArrowUp') keys.up = false;
-    });
-
-    // Клик мыши для разрушения/установки блоков
-    canvas.addEventListener('click', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-        const mouseY = Math.floor((e.clientY - rect.top) / TILE_SIZE);
-
-        // Разрушение блока
-        if (world[mouseX][mouseY] !== 0) {
-            world[mouseX][mouseY] = 0;
-        } 
-        // Установка блока
-        else {
-            world[mouseX][mouseY] = player.selectedBlock;
-        }
-    });
-
-    // Выбор блока для установки
-    document.querySelectorAll('.block').forEach(block => {
-        block.addEventListener('click', () => {
-            player.selectedBlock = parseInt(block.dataset.block);
-        });
-    });
-
-    // Отрисовка мира
-    function drawWorld() {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Смещение камеры относительно игрока
-        const offsetX = player.x * TILE_SIZE - canvas.width / 2;
-        const offsetY = player.y * TILE_SIZE - canvas.height / 2;
-
-        for (let x = 0; x < WORLD_WIDTH; x++) {
-            for (let y = 0; y < WORLD_HEIGHT; y++) {
-                if (world[x][y] !== 0) {
-                    ctx.fillStyle = BLOCK_COLORS[world[x][y]];
-                    ctx.fillRect(
-                        x * TILE_SIZE - offsetX, 
-                        y * TILE_SIZE - offsetY, 
-                        TILE_SIZE, 
-                        TILE_SIZE
-                    );
+            if (isCorrect) {
+                gameState.currentRound++;
+                elements.gameStatus.textContent = 'Верно! Следующий раунд';
+                
+                if (gameState.mode === 'normal' && gameState.currentRound > gameState.totalRounds) {
+                    endGame(true);
+                } else {
+                    setTimeout(nextRound, 1500);
                 }
+            } else {
+                elements.gameStatus.textContent = 'Неверно! Игра окончена';
+                endGame(false);
             }
         }
 
-        // Отрисовка игрока
-        ctx.fillStyle = '#f00';
-        ctx.fillRect(
-            player.x * TILE_SIZE - offsetX, 
-            player.y * TILE_SIZE - offsetY, 
-            player.width * TILE_SIZE, 
-            player.height * TILE_SIZE
-        );
-    }
-
-    // Основной игровой цикл
-    function gameLoop() {
-        // Движение игрока
-        if (keys.left) player.x -= 0.1;
-        if (keys.right) player.x += 0.1;
-        if (keys.up && player.velocityY === 0) {
-            player.velocityY = -10;
+        // Следующий раунд
+        function nextRound() {
+            gameState.playerSequence = [];
+            elements.currentRound.textContent = gameState.currentRound;
+            generateSequence();
+            showSequence();
         }
 
-        // Обновление физики
-        updatePhysics();
+        // Старт игры
+        function startGame(mode) {
+            gameState.mode = mode;
+            gameState.currentRound = 1;
+            gameState.stats.games++;
+            elements.totalGames.textContent = gameState.stats.games;
 
-        // Отрисовка
-        drawWorld();
+            elements.menu.style.display = 'none';
+            elements.gameBoard.style.display = 'block';
+            
+            createGrid();
+            generateSequence();
+            showSequence();
+        }
 
-        requestAnimationFrame(gameLoop);
-    }
+        // Конец игры
+        function endGame(won) {
+            if (won) {
+                gameState.stats.wins++;
+                elements.totalWins.textContent = gameState.stats.wins;
+            }
+            
+            setTimeout(() => {
+                elements.gameBoard.style.display = 'none';
+                elements.menu.style.display = 'block';
+            }, 2000);
+        }
 
-    // Инициализация
-    generateWorld();
-    gameLoop();
+        // Показ статистики
+        function showStats() {
+            elements.menu.style.display = 'none';
+            elements.statsBoard.style.display = 'block';
+        }
 
-    // Адаптивность
-    window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    });
+        // Возврат в меню
+        function backToMenu() {
+            elements.statsBoard.style.display = 'none';
+            elements.menu.style.display = 'block';
+        }
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>

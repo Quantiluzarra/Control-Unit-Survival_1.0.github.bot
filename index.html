@@ -1,64 +1,81 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pixel Terraria</title>
+    <title>Pixel World</title>
     <style>
         body { 
             margin: 0; 
             overflow: hidden; 
-            background: #222;
-            touch-action: none;
+            background: #000;
+            font-family: monospace;
         }
         canvas { 
-            background: #135;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
-        #controls {
+        #inventory {
             position: fixed;
             bottom: 10px;
             width: 100%;
             display: flex;
             justify-content: center;
         }
-        .btn {
+        .block {
             width: 50px;
             height: 50px;
-            background: rgba(255,255,255,0.5);
-            border: 2px solid #fff;
-            margin: 0 10px;
-            touch-action: none;
+            background: rgba(255,255,255,0.3);
+            margin: 0 5px;
+            cursor: pointer;
+            text-align: center;
+            line-height: 50px;
+            color: white;
         }
     </style>
 </head>
 <body>
-    <canvas id="game"></canvas>
-    <div id="controls">
-        <div class="btn" id="left">←</div>
-        <div class="btn" id="right">→</div>
-        <div class="btn" id="jump">↑</div>
-        <div class="btn" id="mine">⛏️</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="inventory">
+        <div class="block" data-block="1">🪨</div>
+        <div class="block" data-block="2">🌳</div>
+        <div class="block" data-block="3">🌿</div>
     </div>
 
     <script>
-    const canvas = document.getElementById('game');
+    // Настройки игры
+    const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    // Игровые константы
-    const TILE_SIZE = 10;
+    // Константы мира
+    const TILE_SIZE = 40;
     const WORLD_WIDTH = 200;
     const WORLD_HEIGHT = 100;
 
-    // Состояние мира
+    // Цвета блоков
+    const BLOCK_COLORS = {
+        0: '#135',     // Пустота
+        1: '#654',     // Камень
+        2: '#461',     // Дерево
+        3: '#2a4'      // Трава
+    };
+
+    // Генерация мира
     let world = Array(WORLD_WIDTH).fill().map(() => 
         Array(WORLD_HEIGHT).fill(0)
     );
 
-    // Генерация мира
+    // Генерация ландшафта
     function generateWorld() {
         for (let x = 0; x < WORLD_WIDTH; x++) {
-            for (let y = WORLD_HEIGHT - 20; y < WORLD_HEIGHT; y++) {
-                world[x][y] = Math.random() > 0.7 ? 1 : 0;
+            // Создаем холмистый ландшафт
+            let height = Math.floor(WORLD_HEIGHT * 0.6 + 
+                Math.sin(x * 0.1) * 10 + 
+                Math.random() * 5);
+            
+            for (let y = height; y < WORLD_HEIGHT; y++) {
+                world[x][y] = y > height + 3 ? 1 : 2;
             }
         }
     }
@@ -69,23 +86,21 @@
         y: 10,
         width: 1,
         height: 2,
-        speed: 0.2,
-        jumpStrength: 0.5,
+        speed: 5,
         velocityY: 0,
-        onGround: false
+        selectedBlock: 1
     };
 
     // Физика и движение
     function updatePhysics() {
         // Гравитация
-        player.velocityY += 0.1;
+        player.velocityY += 0.5;
         player.y += player.velocityY;
 
-        // Столкновения с землей
-        if (player.y + player.height > WORLD_HEIGHT) {
-            player.y = WORLD_HEIGHT - player.height;
+        // Проверка столкновений с землей
+        if (world[Math.floor(player.x)][Math.floor(player.y + player.height)]) {
+            player.y = Math.floor(player.y);
             player.velocityY = 0;
-            player.onGround = true;
         }
     }
 
@@ -93,36 +108,61 @@
     const keys = {
         left: false,
         right: false,
-        jump: false,
-        mine: false
+        up: false
     };
 
-    // Обработчики управления
-    document.getElementById('left').addEventListener('touchstart', () => keys.left = true);
-    document.getElementById('left').addEventListener('touchend', () => keys.left = false);
-    document.getElementById('right').addEventListener('touchstart', () => keys.right = true);
-    document.getElementById('right').addEventListener('touchend', () => keys.right = false);
-    document.getElementById('jump').addEventListener('touchstart', () => {
-        if (player.onGround) {
-            player.velocityY = -player.jumpStrength;
-            player.onGround = false;
+    // Обработчики событий
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') keys.left = true;
+        if (e.key === 'ArrowRight') keys.right = true;
+        if (e.key === 'ArrowUp') keys.up = true;
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft') keys.left = false;
+        if (e.key === 'ArrowRight') keys.right = false;
+        if (e.key === 'ArrowUp') keys.up = false;
+    });
+
+    // Клик мыши для разрушения/установки блоков
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+        const mouseY = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+
+        // Разрушение блока
+        if (world[mouseX][mouseY] !== 0) {
+            world[mouseX][mouseY] = 0;
+        } 
+        // Установка блока
+        else {
+            world[mouseX][mouseY] = player.selectedBlock;
         }
     });
-    document.getElementById('mine').addEventListener('touchstart', () => keys.mine = true);
-    document.getElementById('mine').addEventListener('touchend', () => keys.mine = false);
+
+    // Выбор блока для установки
+    document.querySelectorAll('.block').forEach(block => {
+        block.addEventListener('click', () => {
+            player.selectedBlock = parseInt(block.dataset.block);
+        });
+    });
 
     // Отрисовка мира
     function drawWorld() {
-        ctx.fillStyle = '#135';
+        ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Смещение камеры относительно игрока
+        const offsetX = player.x * TILE_SIZE - canvas.width / 2;
+        const offsetY = player.y * TILE_SIZE - canvas.height / 2;
 
         for (let x = 0; x < WORLD_WIDTH; x++) {
             for (let y = 0; y < WORLD_HEIGHT; y++) {
-                if (world[x][y] === 1) {
-                    ctx.fillStyle = '#654';
+                if (world[x][y] !== 0) {
+                    ctx.fillStyle = BLOCK_COLORS[world[x][y]];
                     ctx.fillRect(
-                        x * TILE_SIZE, 
-                        y * TILE_SIZE, 
+                        x * TILE_SIZE - offsetX, 
+                        y * TILE_SIZE - offsetY, 
                         TILE_SIZE, 
                         TILE_SIZE
                     );
@@ -133,8 +173,8 @@
         // Отрисовка игрока
         ctx.fillStyle = '#f00';
         ctx.fillRect(
-            player.x * TILE_SIZE, 
-            player.y * TILE_SIZE, 
+            player.x * TILE_SIZE - offsetX, 
+            player.y * TILE_SIZE - offsetY, 
             player.width * TILE_SIZE, 
             player.height * TILE_SIZE
         );
@@ -142,11 +182,14 @@
 
     // Основной игровой цикл
     function gameLoop() {
-        // Движение
-        if (keys.left) player.x -= player.speed;
-        if (keys.right) player.x += player.speed;
+        // Движение игрока
+        if (keys.left) player.x -= 0.1;
+        if (keys.right) player.x += 0.1;
+        if (keys.up && player.velocityY === 0) {
+            player.velocityY = -10;
+        }
 
-        // Физика
+        // Обновление физики
         updatePhysics();
 
         // Отрисовка
@@ -155,7 +198,7 @@
         requestAnimationFrame(gameLoop);
     }
 
-    // Старт игры
+    // Инициализация
     generateWorld();
     gameLoop();
 
